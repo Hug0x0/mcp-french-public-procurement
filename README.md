@@ -6,6 +6,8 @@ MCP server for French public procurement data: DECP, BOAMP discovery, buyers, su
 
 Run the MCP and call `french_public_procurement_get_sources` first to inspect source coverage. This server also exposes domain-specific tools for the topic described above.
 
+Includes raw and curated DECP search, procurement dataset discovery, and supplier/buyer watch-plan helpers.
+
 ## Install
 
 ```bash

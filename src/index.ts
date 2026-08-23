@@ -184,6 +184,42 @@ server.tool('french_public_procurement_search_decp', 'Query the consolidated DEC
   }
 });
 
+server.tool('french_public_procurement_search_decp_curated', 'Query DECP and return curated procurement fields instead of raw OpenDataSoft records.', {
+  query: z.string().optional().describe('Free-text search across the DECP record.'),
+  year: z.number().int().optional().describe('Notification year when available.'),
+  limit: z.number().int().min(1).max(100).default(20),
+}, async ({ query, year, limit }) => {
+  try {
+    const where = [
+      query ? `search('${query.replace(/'/g, "''")}')` : undefined,
+      year ? `datenotification >= date'${year}-01-01' AND datenotification < date'${year + 1}-01-01'` : undefined,
+    ].filter(Boolean).join(' AND ');
+    const data = await odsRecords('https://data.economie.gouv.fr', 'decp-v3-marches-valides', { where, limit });
+    const rows = Array.isArray(data.results) ? data.results as Array<Record<string, unknown>> : [];
+    return jsonResult({
+      source: 'data.economie.gouv.fr/decp-v3-marches-valides',
+      query: { query, year, limit },
+      total_count: data.total_count,
+      contracts: rows.map((row) => ({
+        id: row.id,
+        object: row.objet ?? row.object,
+        amount_eur: row.montant ?? row.valeurglobale,
+        notification_date: row.datenotification,
+        publication_date: row.datepublicationdonnees,
+        procedure: row.procedure,
+        buyer_name: row.acheteur_nom ?? row.acheteur_id,
+        buyer_id: row.acheteur_id,
+        supplier_name: row.titulaire_denominationsociale ?? row.titulaire_denominationsociale_1,
+        supplier_id: row.titulaire_id ?? row.titulaire_id_1,
+        cpv: row.cpv ?? row.codecpv,
+        raw_keys_available: Object.keys(row).slice(0, 40),
+      })),
+    });
+  } catch (error) {
+    return errorResult(error instanceof Error ? error.message : 'Failed to query curated DECP');
+  }
+});
+
 server.tool('french_public_procurement_search_datasets', 'Search data.gouv.fr for public-procurement datasets such as DECP, BOAMP, concessions, buyers, and PLACE exports.', {
   query: z.string().default('données essentielles commande publique BOAMP'),
   page_size: z.number().int().min(1).max(50).default(10),
